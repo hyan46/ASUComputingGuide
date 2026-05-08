@@ -1,109 +1,178 @@
-#+TITLE: Guide to Agave Cluster
+#+TITLE: Guide to the Sol Supercomputer (ASU Research Computing)
 #+ROAM_ALIAS:
 #+ROAM_TAGS:
 #+CREATED: [2020-10-20 Tue 16:47]
-#+LAST_MODIFIED: [2020-10-20 Tue 17:51]
+#+LAST_MODIFIED: [2026-05-08 Fri]
 
 
-The information of the guideline can be found in [[https://cores.research.asu.edu/research-computing/getting-started][Research Computing | Get Started | Core Facilities]]
+The official getting-started material lives on [[https://cores.research.asu.edu/research-computing/getting-started][Research Computing | Get Started | Core Facilities]]. Detailed user documentation is on [[https://docs.rc.asu.edu/][docs.rc.asu.edu]] and [[https://asurc.atlassian.net/wiki/spaces/RC/overview][Research Computing Confluence]].
 
-* Login to the Agave cluster
+The legacy Agave login host (=agave.asu.edu=) is no longer used for routine access; Agave-era hardware was migrated and is now served as the Phoenix system. This guide targets **Sol**, ASU’s primary supercomputer at the Iron Mountain data center.
+
+* SSH login to Sol
+From a terminal on Mac or Linux:
+
 #+BEGIN_SRC sh
-ssh ASURITE@agave.asu.edu
+ssh ASURITE@login.sol.rc.asu.edu
 #+END_SRC
-Please replace the ASURITE with your ASU ID.
-After that you will be login to the =Login Node=, which is a node to set up your enviornment and submit jobs, not for computing!
+
+Replace =ASURITE= with your ASU ID. Use your ASURITE password when prompted.
+
+From off campus, connect to the ASU VPN first (recommended: [[https://sslvpn.asu.edu/2fa][sslvpn.asu.edu/2fa]] with Duo). See [[https://asurc.atlassian.net/wiki/spaces/RC/pages/1905131521/Connecting+to+the+Supercomputers+with+SSH][Connecting to the Supercomputers with SSH]] for PuTTY on Windows (=sol.asu.edu=, port 22) and other options.
+
+After login you land on a *login node*: use it to edit files, manage environments, and submit jobs—not for heavy computation.
+
+Optional: browser access via [[https://asurc.atlassian.net/wiki/x/bIBOdw][Open OnDemand]] (linked from the getting-started page).
 
 
-* Prepare your environment (Optional, Only for Python)
- Follow the guideline: [[https://asurc.atlassian.net/wiki/spaces/RC/pages/125829137/Using+anaconda+environments][Using anaconda environments - Research Computing - ASU Research Computing Confluence]]
+* Prepare your environment (optional; Python example)
+Follow Research Computing’s current instructions for conda when in doubt: [[https://asurc.atlassian.net/wiki/spaces/RC/pages/125829137/Using+anaconda+environments][Using anaconda environments]].
 
-1. Run the following commands to create environment
+1. Create an environment (exact =module load= names can change; run =module avail= on Sol if a module fails):
+
    #+BEGIN_SRC sh
    module load anaconda/py3
    conda create -n ENV_NAME  # Create a new environment
    #+END_SRC
 
-2. Install your environment with required packages
+2. Install packages:
+
   #+BEGIN_SRC sh
-  source activate ENV_NAME
-  conda install numpy # Install all pacakge you need
+  conda activate ENV_NAME
+  conda install numpy   # Install packages you need
   #+END_SRC
 
+
 * Upload your code and data
-There are multiple ways of uploading your code and data.
+Several common options:
 
-1. You can use =dropbox= to upload the files to the server.
-    Here is the guide of using Dropbox.
-    [[https://asurc.atlassian.net/wiki/spaces/RC/pages/67534849/Dropbox+Uploader][Dropbox Uploader - Research Computing - ASU Research Computing Confluence]]
+1. [[https://asurc.atlassian.net/wiki/spaces/RC/pages/67534849/Dropbox+Uploader][Dropbox Uploader]] on the cluster.
 
-2. To use command line =scp=, you can use the following (LINUX or Mac only)
+2. =scp= or =rsync= from your laptop (Linux or macOS):
+
     #+BEGIN_SRC bash
-    scp PATH_TO_YOUR_FILE ASURITE@agave.asu.edu:~
+    scp PATH_TO_YOUR_FILE ASURITE@login.sol.rc.asu.edu:~
     #+END_SRC
-    Please change the PATH_TO_YOUR_FILE with the file with your names.
 
-3. Use software that supports sftp
-   Examples:
-   - Use WinSCP in windows
-   - Use Fugu or CyberDuck for mac
-4. Use git
-   You can use =git clone= to get the code from the repository, which is generally recommended for code upload.
-* Prepare your code with additional bash file
-1. You need to prepare a bash file =run.sh= to be able to submit the code.
+    Replace =PATH_TO_YOUR_FILE= with your local path.
 
-   Here are some examples Here are some explanations
-   + #SBATCH --mem-per-cpu=512 # Specify the memory per each node, here is 512MB
-   + #SBATCH --job-name='test' # Name of your job, can change
-   + #SBATCH --error=job.%J.err  # Error files output, can leave as it is
-   + #SBATCH --output=job.%J.out  # files standard output, can leave as it is
-   + #SBATCH --array 1-10        # Important, change as you needed, this says how many iterations it will run. In general, this number will be passed into each computation node with the variable =SLURM_ARRAY_TASK_ID= in your code.
-2. =run.sh= file examples
-   - MATLAB example
+   Overview of transfer tools: [[https://asurc.atlassian.net/wiki/spaces/RC/pages/1852670115/Transferring+Files+to+a+Supercomputer][Transferring Files to a Supercomputer]].
+
+3. SFTP-capable clients (e.g. WinSCP on Windows; Cyberduck, FileZilla, or similar on macOS).
+
+4. Git — clone your repository on Sol after login (=git clone ...=); preferred for code.
+
+
+* Prepare your job script (=run.sh=)
+SLURM on Sol uses #SBATCH directives. Pick appropriate **partitions**, **wall time**, and **QoS** for your job; defaults and limits are documented here: [[https://docs.rc.asu.edu/partitions-and-qos][Partitions and QoS]] and [[https://docs.rc.asu.edu/slurm-sbatch-job-scripts][SBATCH job scripts]].
+
+Common directives:
+
+   + =#SBATCH --partition=public= — widely used CPU/GPU partition for many workloads (see docs for alternatives such as =htc=, =highmem=, =lightwork=).
+   + =#SBATCH --time=1-00:00= — maximum wall time (adjust as needed).
+   + =#SBATCH --mem-per-cpu=512= — memory per CPU (units depend on site defaults; confirm with =sbatch --help= or RC docs).
+   + =#SBATCH --job-name=test= — job name.
+   + =#SBATCH --error=job.%J.err= — stderr file.
+   + =#SBATCH --output=job.%J.out= — stdout file.
+   + =#SBATCH --array=1-10= — array job indices (optional).
+
+Example scripts:
+
+   - MATLAB
+
     #+BEGIN_SRC bash
      #!/bin/sh
+     #SBATCH --partition=public
+     #SBATCH --time=1-00:00
      #SBATCH --mem-per-cpu=512
-     #SBATCH --job-name='test'
+     #SBATCH --job-name=test
      #SBATCH --error=job.%J.err
      #SBATCH --output=job.%J.out
-     #SBATCH --array 1-3
+     #SBATCH --array=1-3
 
      module load matlab/2016a
      matlab -nodisplay -r "run, quit"
     #+END_SRC
-    This is similar as above.
-   - Python example
+
+   - Python
 
     #+BEGIN_SRC bash
     #!/bin/sh
+    #SBATCH --partition=public
+    #SBATCH --time=1-00:00
     #SBATCH --mem-per-cpu=512
-    #SBATCH --job-name='test'
+    #SBATCH --job-name=test
     #SBATCH --error=job.%J.err
     #SBATCH --output=job.%J.out
-    #SBATCH --array 1-10
+    #SBATCH --array=1-10
 
-    module purge  # Always purge modules to ensure consistent environments
-    # Load required modules for job's environment
+    module purge
     module load anaconda/py3
-    source activate pytorch
+    conda activate pytorch
     python test.py
-    source deactivate pytorch
+    conda deactivate
     #+END_SRC
-3. Prepere your code.    You need to add the following in your code:
-   - Python exmaple: =i = int(os.environ["SLURM_ARRAY_TASK_ID"])=
-   - Matlab example: =i=str2num(getenv('SLURM_ARRAY_TASK_ID'));=
 
-   This basically load the variable =SLURM_ARRAY_TASK_ID= into your file. This will be used as a seed in your random number generator in your simulation study.
-4. Please remember to save the files with the =i= in your file name so each node is saving into different file name.
-* Submit your code
+Use the array index inside your program:
+
+   - Python: =i = int(os.environ["SLURM_ARRAY_TASK_ID"])=
+   - MATLAB: =i=str2num(getenv('SLURM_ARRAY_TASK_ID'));=
+
+Save outputs so each array task writes a distinct filename (e.g. include =i= in the path).
+
+
+* Intel Gaudi accelerators (Sol)
+Sol includes **Intel Gaudi** AI accelerator nodes. These are scheduled separately from NVIDIA GPUs: pick the Gaudi partition and request hardware with Slurm **generic resources** (=--gres=).
+
+- *Partition:* Research Computing often documents this queue as =gaudi=; some listings use names such as =sol-gaudi=. **Always confirm** the live name with =sinfo= (for example =sinfo -s= or =sinfo -o '%P %G'=) or staff guidance.
+- *GRES:* Request the =gaudi= resource type and the number of accelerators, e.g. =--gres=gaudi:1= for one card.
+
+Published examples and hardware-specific forms also appear on [[https://docs.rc.asu.edu/requesting-resources#gaudi-accelerators][Requesting Resources → Gaudi Accelerators]] (e.g. =-G 1= or =--gres=gpu:hl225:N= for multiple Habana devices on one node). RC recommends about **18 CPUs per accelerator** on full Gaudi nodes (=--cpus-per-task=18= or equivalent); adjust if staff or =sinfo= indicate otherwise.
+
+Gaudi jobs need a Habana-aware software stack (RC notes tested Jupyter kernels such as =gaudi-pytorch=); see the same documentation section for environments.
+
+**Example =sbatch= snippet**
+
+#+BEGIN_SRC bash
+#!/bin/sh
+#SBATCH --partition=sol-gaudi
+#SBATCH --qos=public
+#SBATCH --nodes=1
+#SBATCH --gres=gaudi:1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=0-4:00
+#SBATCH --job-name=gaudi-test
+
+# module load / conda activate your Gaudi-ready environment here
+# python train.py
+#+END_SRC
+
+If =sol-gaudi= is not valid on your account, substitute the partition name shown in =sinfo= (often =gaudi= in RC docs).
+
+**Example interactive session**
+
+#+BEGIN_SRC sh
+salloc --partition=sol-gaudi --qos=public -N 1 --gres=gaudi:1 -c 18 -t 0-4:00
+#+END_SRC
+
+When the allocation succeeds, your shell runs on a compute node; then load modules or activate conda before starting work.
+
+
+* Submit your job
 #+BEGIN_SRC sh
 sbatch run.sh
 #+END_SRC
-This will submit the code with diffurent =SLURM_ARRAY_TASK_ID= into different computational nodes.
-* Check you code status
-You can use =squeue= to check the status of all jobs
-It is often convinient to search only your jobs by
-=squeue|grep ASURITE=. Please replace the ASURITE with your ASU ID.
+
+Each array task runs with its own =SLURM_ARRAY_TASK_ID=.
+
+
+* Check job status
+=squeue= lists jobs in the queue. Filter to your user:
+
+=squeue -u ASURITE=
+
+(or =squeue | grep ASURITE=).
+
 
 * Collect results
-Please go into the saved files to check results. If the saved files are not generated or the result is not correct. Please check in =job.ID.err= to see if there are any errors showing up.
+Inspect your output files. If something failed, read =job.<JOBID>.err= (and the matching =.out= file) in the submission directory.
