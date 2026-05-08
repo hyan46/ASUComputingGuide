@@ -121,6 +121,44 @@ Use the array index inside your program:
 Save outputs so each array task writes a distinct filename (e.g. include =i= in the path).
 
 
+* Python examples: NVIDIA A100 and Intel Gaudi (PyTorch + JAX)
+Minimal **Slurm** jobs on Sol. Confirm =--gres= / partition names with =sinfo= and [[https://docs.rc.asu.edu/requesting-resources][Requesting Resources]].
+
+Install Python deps once per conda env (edit CUDA variant for JAX):
+
+- [[file:test/python/requirements-accelerators.txt][test/python/requirements-accelerators.txt]] — PyTorch + =jax[cuda12]= + =pytest= for **A100**.
+- On **Gaudi**, keep RC’s Habana PyTorch stack; add plain =pip install jax jaxlib= if you want the CPU JAX script below.
+
+Runnable sources and Slurm drivers: [[file:test/python/][test/python/]] (=run_a100.sh=, =run_gaudi.sh=). Automated checks: =test_accelerators.py=.
+
+**1. A100 — PyTorch (CUDA) and JAX (CUDA)**
+
+=*run_a100.sh=* runs, in order: =a100_pytorch.py=, =a100_jax.py=, then =pytest -k a100=.
+
+- PyTorch uses =device="cuda:0"=.
+- JAX must see =jax.default_backend() == "gpu"= (install a CUDA =jaxlib= matching the node driver, e.g. =pip install "jax[cuda12]"=).
+
+If =--gres=gpu:a100:1= is rejected, try =#SBATCH -G 1= or ask RC for the current A100 GRES / feature string.
+
+**2. Gaudi — PyTorch (HPU) and JAX (CPU only)**
+
+=*run_gaudi.sh=* runs =gaudi_pytorch.py= (Habana PyTorch on =hpu=), then =gaudi_jax_cpu.py=, then =pytest -k gaudi=.
+
+There is **no** standard JAX backend for Gaudi HPUs comparable to Habana PyTorch; the JAX script is a **CPU** matmul sanity check on the same node. Use PyTorch+Habana for accelerator math on Gaudi.
+
+Partition =gaudi=, =-G 1=, ~18 CPUs per device matches [[https://docs.rc.asu.edu/requesting-resources#gaudi-accelerators][RC’s Gaudi example]]; swap to =sol-gaudi= / =--gres=gaudi:1= if your site lists that instead.
+
+**Local test (laptop / CI)**
+
+From the repo:
+
+#+BEGIN_SRC sh
+cd test/python && python -m pytest -q test_accelerators.py
+#+END_SRC
+
+A100 tests skip without CUDA; Gaudi PyTorch skips without Habana; the Gaudi JAX test only needs CPU JAX.
+
+
 * Intel Gaudi accelerators (Sol)
 Sol includes **Intel Gaudi** AI accelerator nodes. These are scheduled separately from NVIDIA GPUs: pick the Gaudi partition and request hardware with Slurm **generic resources** (=--gres=).
 
